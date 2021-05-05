@@ -6,17 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:provider/provider.dart';
-import 'package:btc_calculator/ad_state.dart';
+import 'package:btc_calculator/ad_helper.dart';
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  final initFuture = MobileAds.instance.initialize();
-  final adState = AdState(initFuture);
-  // runApp(MyApp());
-  runApp(Provider.value(
-    value: adState,
-    builder: (context, child) => MyApp(),
-  ));
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -30,6 +23,11 @@ class MyApp extends StatelessWidget {
       ),
       home: MyHomePage(title: '仮想通貨換算'),
     );
+  }
+
+  Future<InitializationStatus> _initGoogleMobileAds() {
+    // TODO: Initialize Google Mobile Ads SDK
+    return MobileAds.instance.initialize();
   }
 }
 
@@ -65,7 +63,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
   String _currentCurrency = 'btc';
   String _dropdownValue = 'Bitcoin(BTC)';
-  late BannerAd banner;
+
+  late BannerAd _ad;
+  bool _isAdLoaded = false;
 
   // Rate params
   double _jpyRate = 0.0;
@@ -149,23 +149,29 @@ class _MyHomePageState extends State<MyHomePage> {
     super.initState();
     getRate(_currentCurrency);
 
-  }
+    // TODO: Create a BannerAd instance
+    _ad = BannerAd(
+      adUnitId: AdHelper.bannerAdUnitId,
+      size: AdSize.banner,
+      request: AdRequest(),
+      listener: AdListener(
+        onAdLoaded: (_) {
+          setState(() {
+            _isAdLoaded = true;
+          });
+        },
+        onAdFailedToLoad: (ad, error) {
+          // Releases an ad resource when it fails to load
+          ad.dispose();
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final adState = Provider.of<AdState>(context);
-    adState.initialization.then((status) {
-      setState(() {
-        banner = BannerAd(
-          adUnitId: adState.bannerAdUnitId,
-          size: AdSize.banner,
-          request: AdRequest(),
-          listener: adState.adListener,
-        )
-          ..load();
-      });
-    });
+          print('Ad load failed (code=${error.code} message=${error.message})');
+        },
+      ),
+    );
+
+    // TODO: Load an ad
+    _ad.load();
+
   }
 
   @override
@@ -284,7 +290,7 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
             ),
             Container(
-              color: Colors.yellow,
+              // color: Colors.yellow,
               // height: 100,
               padding: EdgeInsets.only(right: 10.0, left: 10.0),
               child: Column(
@@ -333,12 +339,11 @@ class _MyHomePageState extends State<MyHomePage> {
                 ],
               ),
             ),
-            if (banner == null)
-              SizedBox(height: 50) // Ads
-            else
-              Container(
-                height: 50,
-                child: AdWidget(ad: banner),
+            if (_isAdLoaded) Container(
+                child: AdWidget(ad: _ad),
+                width: _ad.size.width.toDouble(),
+                height: 72.0,
+                alignment: Alignment.center,
               ),
           ],
         ),
